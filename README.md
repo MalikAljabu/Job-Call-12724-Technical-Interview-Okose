@@ -2,8 +2,8 @@
 ## Job Call 12724 - 2 Cloud System Administrators Junior and/or Senior
 ### Name: Emmanuel Okose
 ### First Interview: 17/07/2025
-### Invitation date: 27/08/2025 at 10:00 
-### Due Date: 03/09/2025 at 10:00
+### Invitation date: 27/08/2025 at 14:45 
+### Due Date: 03/09/2025 at 14:45
 ### Exercise: Helm Chart for Deploying JupyterHub with Dual PVCs
 ### Objective:
 #### Create a Helm Chart that deploys a JupyterHub* instance along with two associated PersistentVolumeClaims (PVCs) of different sizes. One PVC should be configured as read-only and used for processing input data, while the other should be read-write for storing “jupyter notebooks” and results.
