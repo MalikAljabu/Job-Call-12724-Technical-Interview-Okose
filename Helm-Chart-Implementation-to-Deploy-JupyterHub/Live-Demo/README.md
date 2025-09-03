@@ -473,7 +473,12 @@ kubectl get events
 ## Thank you!
 
 ## References
-* Helm Chart - <https://helm.sh/docs/>
+
+- JupyterHub documentation: [jupyterhub.readthedocs.io](https://jupyterhub.readthedocs.io/)
+- Helm documentation: [helm.sh/docs](https://helm.sh/docs/)
+- Kubernetes concepts: [kubernetes.io/docs](https://kubernetes.io/docs/home/)
+- cert-manager: [cert-manager.io/docs](https://cert-manager.io/docs/)
+- NGINX Ingress Controller: [ingress-nginx docs](https://kubernetes.github.io/ingress-nginx/)
 * JupyterHub Helm Chart - <https://z2jh.jupyter.org>
 * Azure AKS Docs - <https://learn.microsoft.com/azure/aks/>
 * Azure Files CSI - <https://learn.microsoft.com/azure/aks/azure-files-volume>
