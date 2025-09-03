@@ -419,5 +419,9 @@ helm upgrade cmcc-juphub ./
 ![Screenshot: Verifying Tls](./images/verify-tls.png)</br>
 *Fig: Verifying the TLS attribute of our chart*
 
+### 3. Verify Post install hook
+After installing our jupyterhub helm chart, we should of course go and inspect the values of our post-install job.
+![Screenshot: Verifying Post Install hok](./images/post-inst-val.png)</br>
+*Fig: Verifying Post Install Hook*
 
 
