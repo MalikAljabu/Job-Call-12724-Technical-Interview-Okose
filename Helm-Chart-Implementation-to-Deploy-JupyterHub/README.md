@@ -1,4 +1,4 @@
-![Banner: README Banner Image ](./images/banner.png)</br>
+![Banner: README Banner Image ](./images/banner-0.png)</br>
 # JupyterHub Helm Chart (CMCC)
 
 This chart deploys a JupyterHub instance to k8s (kubernetes, in our case: Azure Kubernetes) clusters. 
