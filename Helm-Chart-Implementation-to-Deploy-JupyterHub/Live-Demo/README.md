@@ -46,12 +46,12 @@ graph TD
             E -- "mounts" --> H[Notebook PVC - ReadWriteOnce]
         end
 
-        %% External Azure Services
-        I[Azure Container Registry - ACR] --> D
+        %% External Azure Services and or other services
+        I[**Azure Container Registry**</br> OR </br> - Quay.io</br> - Oracle Container Registry</br> - Docker hub</br>] --> D
         J[Azure Disk Storage] --> G
         J --> H
 
-        K[Azure Active Directory] --> L[Authentication Flow]
+        K[Azure Active Directory - Optional] --> L[Authentication Flow]
         L --> C
     end
 ```
@@ -153,16 +153,8 @@ az group create --name jupHub-RG --location eastus
 This command creates an AKS cluster with a system-assigned managed identity, enabling easy integration with other Azure services. Adjust node count and size as needed.
 
 ```bash
-az aks create \
-    --resource-group jupHub-RG \
-    --name jupHub-AKSCluster \
-    --node-count 2 \
-    --node-vm-size Standard_DS2_v2 \
-    --enable-managed-identity \
-    --generate-ssh-keys
+az aks create --resource-group jupHub-RG --name jupHub-AKSCluster --node-count 2 --node-vm-size Standard_D4s_v3 --enable-managed-identity --generate-ssh-keys
 ```
-![Screenshot: Creating Kubernetes Cluster](./images/create-aks.png)
-*Fig: Creating Azure Kubernetes Cluster.*
 
 ### 5. Get AKS Cluster Credentials
 
@@ -189,7 +181,7 @@ az acr create --resource-group jupHub-RG --name juphubacrregistry --sku Basic
 ```
 > ![Screenshort: Acr creation error](./images/acr-error.png)
 > ![Screenshort: Acr creation success](./images/acr-success.png)</br>
-> ⚠️ **_I could not maintain the naming convention here, because I was prompted by the az-cli, informing me that creating this container registry requires an all lower-case name type_**
+> ⚠️ **_I could not maintain the naming convention here, because I was prompted by the az-cli which informed  me that creating this container registry requires an all lower-case name type_**
 
 ### 7. Attach ACR to AKS Cluster (Optional, but Recommended)
 
@@ -200,3 +192,232 @@ az aks update -n jupHub-AKSCluster -g jupHub-RG --attach-acr juphubacrregistry
 ``` 
 ![Screenshot: Attaching Azure Container Registry](./images/attach-acr.png)</br>
 *Fig: Attaching Azure Container Registry*
+
+## Helm Chart Deployment on AKS
+
+This section details how to deploy the JupyterHub Helm chart to your newly provisioned AKS cluster.
+
+### 1. Navigate into the Helm Chart Directory
+
+After you have successfully cloned this helm chart provided in this repository into your environment, navigate into the chart's directory
+
+```bash
+cd jupyterhub-chart
+```
+
+### 2. Customize the `values.yaml` for Azure (or the infrastructure environment of your choice)
+
+Open the `values.yaml` file in the `jupyterhub-chart` directory and make the following adjustments to optimize for Azure Disk storage, other Azure-specific configurations and modify other specifications as you see fit.
+
+**Example `values.yaml` adjustments:**
+
+```yaml
+persistence:
+  dataVolume:
+    # Use a storage class suitable for read-only data, I use 'azurefile' here because it supports "ROX" (Read only many)
+    storageClass: "azurefile"
+    # Ensure the accessModes is ReadOnlyMany for shared data
+    accessModes:
+      - ReadOnlyMany
+    size: 5Gi
+    mountPath: /data
+
+  notebookVolume:
+    # Use a performance-optimized storage class, in my case, I used 'managed-csi-premium'
+    storageClass: "managed-csi-premium"
+    #  Ensure the accessModes here is set to ReadWriteOnce for individual user notebooks
+    accessModes:
+      - ReadWriteOnce
+    size: 20Gi
+    mountPath: /home/jovyan/work
+
+# Enable Ingress for external access
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+
+  hosts:
+    - host: jupyterhub.kosenuel.com # You can replace this with your actual domain
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: jupyterhub-tls # Kubernetes secret for TLS certificate
+      hosts:
+        - jupyterhub.kosenuel.com # you can replace this with your actual domain
+
+# Resource requests and limits for JupyterHub pods
+jupyterhub:
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  # Security context for running as non-root (best practice)
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+```
+
+### 3. Install the Helm Chart
+
+Navigate to the root directory of your Helm chart (`jupyterhub-chart`) and install it.
+
+```bash
+helm install cmcc-juphub ./
+```
+![Screenshot: Install Helm Chart](./images/helm-install.png)</br>
+*Fig: Installing our jupyterhub helm chart*
+
+To verify the installation:
+
+```bash
+helm list
+```
+![Screenshot: List helm releases](./images/helm-list.png)</br>
+*Fig: Viewing the helm release(s)*
+
+### 4. Verify Kubernetes Resources
+
+Check the status of your deployed resources:
+
+```bash
+kubectl get pods
+kubectl get svc -n ingress-nginx
+kubectl get pvc
+kubectl get deployment
+kubectl get ingress 
+```
+Ensure all pods are running and PVCs are bound.
+
+![Screenshot: Verifying Deployed Resources](./images/check-deployed-resources.png)</br>
+*Fig: Viewing the deployed resources in our AKS Cluster*
+
+
+## Accessing JupyterHub on Azure
+### 1. Using Port Forwarding (for testing/development)
+
+If you haven't configured Ingress, you can access JupyterHub via port forwarding:
+
+```bash
+# for bash
+kubectl get pods
+kubectl --namespace default port-forward $POD_NAME 8080:8000
+```
+![Screenshot: Forwarding k8s port ](./images/port-fwd.png)</br>
+*Fig: Forwarding local-port to k8s service port*
+ 
+ 
+Then, open your web browser and navigate to `http://127.0.0.1:8080`.
+
+![Screenshot: Forwarding k8s port ](./images/local-web-access.png)</br>
+*Fig: Accessing Jupyterhub via webui*
+### 2. Using Ingress (for production)
+
+If you enabled Ingress, you would need to configure DNS for your chosen hostname (`jupyterhub.kosenuel.com` in my case) to point to the Ingress Controller's external IP address. You can get the Ingress external IP by following the commands below:
+
+```bash
+kubectl get ingress cmcc-juphub-jupyterhub -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
+![Screenshot: Get Ingress ext IP ](./images/get-ing-ext-ip.png)</br>
+*Fig: Getting the Ingress external IP*
+  
+Once DNS is propagated, navigate to `http://jupyterhub.kosenuel.com` (your configured domain) in your web browser.
+![Screenshot: Accessing the JupHub Web UI ](./images/access-jupyterhub.png)</br>
+*Fig: Accessing the JupyterHub Web UI* 
+
+### Login Credentials
+
+With the default Dummy Authenticator:
+- **Username**: Any username (e.g., "admin", "user", etc.)
+- **Password**: `jupyter` (or your configured password in `values.yaml`)
+![Screenshot: JupyterHub Home Page ](./images/jupyterhub-home-page.png)</br>
+*Fig: Jupyterhub Home Page*
+
+## Post-Deployment Validation and Best Practices
+ 
+### 0. Running Helm Tests
+#### Run `Helm Lint`
+Before deploying, to check the correctness of your chart, it is recommended to run this command against your chart:
+```bash
+helm lint <your chart (which is cmcc-juphub in my case)>
+```
+![Screenshot: Running Helm Lint 1](./images/helm-lint.png)</br>
+![Screenshot: Running Helm Lint 2](./images/helm-lint-1.png)</br>
+*Fig: Viewing the nodes in our newly created AKS Cluster*
+
+
+After a successful deploy, let's run `Helm Test` and see what we get: 
+![Screenshot: Running Helm Test ](./images/run-test.png)</br>
+*Fig: Testing our helm chart*
+
+### 1. Verify Persistent Volumes
+
+Open a terminal, and verify the mount points and access permissions:
+
+```bash
+ls -la /data
+touch /data/test.txt # Should fail (read-only)
+ls -la /home/jovyan/work
+touch /home/jovyan/work/test.txt # Should succeed (read-write)
+```
+![Screenshot: Verifying Persistent Volumes ](./images/verify-pv.png)</br>
+*Fig: Verifying Persistent Volumes*
+
+### 2. Configure TLS with Cert-Manager
+
+So far so good, we have enabled ingress, and the next logical step would be to configure using a cert manager. We are going to do this in 3 steps:
+
+#### Installing `cert-manager` in your cluster.
+- To do this, run this command against your cluster:
+* > kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+
+#### Configuring a ClusterIssuer for Let's Encrypt.
+- Create a `cluster-issuer.yaml` with the following content:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: emmanuel.okose@cmcc.it
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+- Apply it using the command: 
+```bash
+kubectl apply -f cluster-issuer.yaml
+```
+#### Ensure that your Ingress resource has the correct `cert-manager.io/cluster-issuer` annotation and `tls` section.
+
+In your  `values.yaml`, ensure that you have this value set in your `ingress` section: 
+```yaml
+ingress:
+..
+annotations:
+  cert-manager.io/cluster-issuer: "letsencrypt-prod"
+..
+...
+```
+
+Once all these are done, upgrade your helm chart by running:
+```bash
+helm upgrade cmcc-juphub ./
+```
+![Screenshot: Verifying Tls](./images/verify-tls.png)</br>
+*Fig: Verifying the TLS attribute of our chart*
+
+
+
