@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jupyterhub.fullname" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hub
+spec:
+  replicas: {{ .Values.jupyterhub.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "jupyterhub.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: hub
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "jupyterhub.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: hub
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jupyterhub.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.jupyterhub.securityContext | nindent 8 }}
+      initContainers:
+        - name: fix-perms
+          image: busybox:1.35
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -ex
+              # Wait for volumes to be mounted
+              while [ ! -d /home/jovyan/work ]; do echo "Waiting for /home/jovyan/work..."; sleep 2; done
+              while [ ! -d /data ]; do echo "Waiting for /data..."; sleep 2; done
+              chown -R 1000:1000 /home/jovyan/work || true
+              chown -R 1000:1000 /data || true
+          volumeMounts:
+            - name: notebook-volume
+              mountPath: /home/jovyan/work
+            - name: data-volume
+              mountPath: /data
+      
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.jupyterhub.image.repository }}:{{ .Values.jupyterhub.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.jupyterhub.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.jupyterhub.service.targetPort }}
+              protocol: TCP
+          {{- if .Values.healthChecks.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthChecks.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthChecks.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.jupyterhub.resources | nindent 12 }}
+          env:
+            {{- range .Values.jupyterhub.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            
+          volumeMounts:
+            - name: hub-data
+              mountPath: /srv/jupyterhub
+            - name: config
+              mountPath: /srv/jupyterhub/jupyterhub_config.py
+              subPath: jupyterhub_config.py
+              readOnly: true
+            {{- if .Values.persistence.dataVolume.enabled }}
+            - name: data-volume
+              mountPath: {{ .Values.persistence.dataVolume.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.persistence.notebookVolume.enabled }}
+            - name: notebook-volume
+              mountPath: {{ .Values.persistence.notebookVolume.mountPath }}
+            {{- end }}
+      volumes:
+        - name: hub-data
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ include "jupyterhub.fullname" . }}-config
+        {{- if .Values.persistence.dataVolume.enabled }}
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: {{ include "jupyterhub.dataVolumeName" . }}
+        {{- end }}
+        {{- if .Values.persistence.notebookVolume.enabled }}
+        - name: notebook-volume
+          persistentVolumeClaim:
+            claimName: {{ include "jupyterhub.notebookVolumeName" . }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

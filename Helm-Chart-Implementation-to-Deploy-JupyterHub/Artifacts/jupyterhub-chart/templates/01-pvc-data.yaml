@@ -1,0 +1,27 @@
+{{- if .Values.persistence.dataVolume.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "jupyterhub.dataVolumeName" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-storage
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- range .Values.persistence.dataVolume.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.dataVolume.size | quote }}
+  {{- if .Values.persistence.dataVolume.storageClass }}
+  {{- if (eq "-" .Values.persistence.dataVolume.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.dataVolume.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+

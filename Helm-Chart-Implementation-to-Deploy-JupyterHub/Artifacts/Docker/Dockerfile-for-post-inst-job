@@ -1,0 +1,14 @@
+
+FROM debian:12-slim
+
+# Install the necessary tools for the health check script.
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget bash && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set the default shell to bash for consistency and to ensure the script
+SHELL ["/bin/bash", "-c"]
+
+# Set a command to run when the container starts.
+CMD ["echo", "Ready to run the post-install validation script."]

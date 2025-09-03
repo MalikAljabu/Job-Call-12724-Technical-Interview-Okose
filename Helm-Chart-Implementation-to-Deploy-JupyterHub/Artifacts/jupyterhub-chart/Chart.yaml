@@ -1,0 +1,20 @@
+apiVersion: v2
+name: jupyterhub
+description: A Helm chart for deploying JupyterHub with dual PVCs for data processing and notebook storage 
+type: application
+version: 0.1.0
+appVersion: "4.0.2"
+keywords:
+  - jupyter
+  - jupyterhub
+  - data-science
+  - notebooks
+home: https://jupyter.org/hub
+sources:
+  - https://github.com/jupyterhub/jupyterhub
+maintainers:
+  - name: Cloud System Administrator
+    email: emmanuelphrancis@gmail.com
+annotations:
+  category: Development
+

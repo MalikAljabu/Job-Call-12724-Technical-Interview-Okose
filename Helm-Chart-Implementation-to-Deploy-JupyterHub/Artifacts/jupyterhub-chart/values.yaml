@@ -1,0 +1,169 @@
+# Default values for jupyterhub.
+
+# JupyterHub configuration
+jupyterhub:
+  replicaCount: 1
+  image:
+    repository: juphubacrregistry.azurecr.io/cmcc-juphub
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  # Resource configuration
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: false
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  # Environment variables
+  env:
+    - name: JUPYTERHUB_CRYPT_KEY
+      value: "random-keys-adjfaldjaldjaladfahdfajkhdfioie"
+
+  # Authentication configuration
+  auth:
+    type: dummy
+    dummy:
+      password: "jupyter"
+
+  # Spawner configs...
+  spawner:
+    type: kubespawner.KubeSpawner
+    # Optional: set default image for user pods
+    image: quay.io/jupyter/base-notebook:latest
+    # Optional: set resource limits for user pods
+    cpu_limit: 1
+    mem_limit: 1G
+    # Optional: set storage for user pods
+    storage_pvc_ensure: True
+    storage_capacity: 10Gi
+    storage_class: managed-csi-premium
+    storage_access_modes: [ReadWriteOnce]
+    # Optional: set notebook directory
+    notebook_dir: /home/jovyan/work
+
+# Persistent Volume Claims configuration
+persistence:
+  # Data volume (read-only for input data processing)
+  dataVolume:
+    enabled: true
+    size: 5Gi
+    storageClass: "azurefile"
+    accessModes:
+      - ReadOnlyMany
+    mountPath: /data
+    
+  # Notebook volume (read-write for notebooks and results)
+  notebookVolume:
+    enabled: true
+    size: 20Gi
+    storageClass: "azurefile"
+    accessModes:
+      - ReadWriteMany
+    mountPath: /home/jovyan/work
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: 
+     kubernetes.io/ingress.class: nginx
+     kubernetes.io/tls-acme: "true"
+     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: jupyterhub.kosenuel.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: 
+    - secretName: jupyterhub-tls
+      hosts:
+        - jupyterhub.kosenuel.com
+
+# Hooks configuration
+hooks:
+  postInstall:
+    enabled: true
+    image:
+      repository: juphubacrregistry.azurecr.io/cmcc-juphub-post-install
+      tag: latest
+    pullPolicy: IfNotPresent
+
+
+# Health checks
+healthChecks:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /hub/health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /hub/health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Health checks
+healthChecks:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /hub/health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /hub/health
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Node selector and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Pod annotations and labels
+podAnnotations: {}
+podLabels: {}
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Full name override
+nameOverride: ""
+fullnameOverride: ""
+

@@ -1,0 +1,27 @@
+{{- if .Values.persistence.notebookVolume.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "jupyterhub.notebookVolumeName" . }}
+  labels:
+    {{- include "jupyterhub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notebook-storage
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- range .Values.persistence.notebookVolume.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.notebookVolume.size | quote }}
+  {{- if .Values.persistence.notebookVolume.storageClass }}
+  {{- if (eq "-" .Values.persistence.notebookVolume.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.notebookVolume.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+
