@@ -421,7 +421,63 @@ helm upgrade cmcc-juphub ./
 
 ### 3. Verify Post install hook
 After installing our jupyterhub helm chart, we should of course go and inspect the values of our post-install job.
+
+> ⚠️ It is important to note that before implementing/running this post install hook we need to change the notebook access modes to **`RWX`** (Read Write Many) and the PVC Storage class from **`managed-csi-premium`** to **`azurefile`**. This is because the new post-install container would be accessing the notebook's storage for **`documenting its status`**.
+
 ![Screenshot: Verifying Post Install hok](./images/post-inst-val.png)</br>
 *Fig: Verifying Post Install Hook*
 
+
+
+
+
+
+## Troubleshooting
+
+### Common Issues on AKS
+
+- **Pod Pending State**: This often indicates issues with Persistent Volume Claim binding. Check `kubectl describe pvc <pvc-name>` and `kubectl get events` for details. Ensure that your AKS cluster has a default storage class or you have specified a valid one in `values.yaml`.
+- **JupyterHub Not Accessible via ingress**: Verify Ingress controller logs (`kubectl logs -n <ingress-namespace> <ingress-controller-pod>`) and ensure DNS resolution for your domain is correct.
+- **Authentication Failures**: Double-check the password in `values.yaml` for Dummy Authenticator.  
+- **Permission Denied on Volumes**: Ensure the `securityContext` in `values.yaml` is correctly configured and matches the user/group IDs expected by the JupyterHub image (e.g., `1000` for `jovyan`).
+
+### Useful Azure CLI Commands
+
+```bash
+# Get AKS cluster details
+az aks show --resource-group jupHub-RG --name jupHub-AKSCluster --output table
+
+# Get ACR login server
+az acr show --name juphubacrregistry --query loginServer --output tsv
+
+# Show AKS diagnostics
+az aks get-upgrades --resource-group jupHub-RG --name jupHub-AKSCluster
+```
+
+### Useful Kubernetes Commands
+
+```bash
+# Get logs from a JupyterHub pod
+kubectl logs -f <jupyterhub-pod-name>
+
+# Describe a pod for detailed events and status
+kubectl describe pod <jupyterhub-pod-name>
+
+# Execute a shell in a running pod
+kubectl exec -it <jupyterhub-pod-name> -- bash or sh
+
+# Check events in the current namespace
+kubectl get events
+```
+
+## Thank you!
+
+## References
+* Helm Chart - <https://helm.sh/docs/>
+* JupyterHub Helm Chart - <https://z2jh.jupyter.org>
+* Azure AKS Docs - <https://learn.microsoft.com/azure/aks/>
+* Azure Files CSI - <https://learn.microsoft.com/azure/aks/azure-files-volume>
+---
+---
+---
 
